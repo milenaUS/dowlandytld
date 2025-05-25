@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>YouTube Audio Downloader</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        body { padding-top: 20px; }
+        #progress-container { display: none; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Descargar Audio de YouTube</h1>
+        <form id="download-form">
+            <div class="form-group">
+                <label for="url">URL de YouTube:</label>
+                <input type="url" class="form-control" id="url" name="url" required>
+            </div>
+            <div class="form-group">
+                <label for="cookies_file">Archivo de Cookies (opcional):</label>
+                <input type="file" class="form-control-file" id="cookies_file" name="cookies_file">
+            </div>
+            <button type="submit" class="btn btn-primary">Descargar</button>
+        </form>
+
+        <div id="progress-container">
+            <h2>Descargando...</h2>
+            <div class="progress">
+                <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">0%</div>
+            </div>
+            <p id="progress-message"></p>
+            <div id="download-link-container" style="display: none; margin-top: 10px;">
+                <a id="download-link" class="btn btn-success" href="#">Descargar Audio</a>
+            </div>
+            <div id="error-message" class="alert alert-danger" style="display: none; margin-top: 10px;"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const downloadForm = document.getElementById('download-form');
+            const progressContainer = document.getElementById('progress-container');
+            const progressBar = document.getElementById('progress-bar');
+            const progressMessage = document.getElementById('progress-message');
+            const downloadLinkContainer = document.getElementById('download-link-container');
+            const downloadLink = document.getElementById('download-link');
+            const errorMessageDiv = document.getElementById('error-message');
+
+            downloadForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                const url = document.getElementById('url').value;
+                const cookiesFile = document.getElementById('cookies_file').files[0];
+                const formData = new FormData();
+                formData.append('url', url);
+                if (cookiesFile) {
+                    formData.append('cookies_file', cookiesFile);
+                }
+
+                progressContainer.style.display = 'block';
+                progressBar.style.width = '0%';
+                progressBar.textContent = '0%';
+                progressMessage.textContent = 'Iniciando descarga...';
+                downloadLinkContainer.style.display = 'none';
+                errorMessageDiv.style.display = 'none';
+
+                fetch('/start-download', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'started') {
+                        const downloadId = data.download_id;
+                        const intervalId = setInterval(() => {
+                            fetch(`/progress/${downloadId}`)
+                                .then(resp => resp.json())
+                                .then(progressData => {
+                                    if (progressData.status === 'downloading' || progressData.status === 'processing') {
+                                        progressBar.style.width = `${progressData.progress}%`;
+                                        progressBar.textContent = `${Math.floor(progressData.progress)}%`;
+                                        progressMessage.textContent = progressData.message;
+                                    } else if (progressData.status === 'completed') {
+                                        clearInterval(intervalId);
+                                        progressContainer.style.display = 'none'; // O mostrar un mensaje de éxito y un enlace
+                                        window.location.href = `/get-file/${downloadId}`;
+                                    } else if (progressData.status === 'error') {
+                                        clearInterval(intervalId);
+                                        progressMessage.textContent = `Error: ${progressData.message}`;
+                                        progressBar.classList.remove('bg-success');
+                                        progressBar.classList.add('bg-danger');
+                                        progressBar.style.width = '100%';
+                                        progressBar.textContent = 'Error';
+                                        errorMessageDiv.textContent = progressData.message;
+                                        errorMessageDiv.style.display = 'block';
+                                    } else if (progressData.status === 'not_found') {
+                                        clearInterval(intervalId);
+                                        progressMessage.textContent = 'Descarga no encontrada.';
+                                        progressBar.style.width = '0%';
+                                    }
+                                })
+                                .catch(error => {
+                                    clearInterval(intervalId);
+                                    progressMessage.textContent = 'Error al obtener el progreso.';
+                                    console.error('Error fetching progress:', error);
+                                });
+                        }, 1000); // Actualizar cada segundo
+                    } else if (data.error) {
+                        progressMessage.textContent = `Error: ${data.error}`;
+                        progressBar.classList.remove('bg-success');
+                        progressBar.classList.add('bg-danger');
+                        progressBar.style.width = '100%';
+                        progressBar.textContent = 'Error';
+                        errorMessageDiv.textContent = data.error;
+                        errorMessageDiv.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    progressMessage.textContent = 'Error al iniciar la descarga.';
+                    console.error('Error starting download:', error);
+                    errorMessageDiv.textContent = 'Error al iniciar la descarga.';
+                    errorMessageDiv.style.display = 'block';
+                });
+            });
+        });
+    </script>
+</body>
+</html>

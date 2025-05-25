@@ -1,0 +1,4 @@
+requests
+Flask
+yt-dlp
+gunicorn

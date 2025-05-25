@@ -44,6 +44,8 @@ def download_audio_api():
     youtube_url = data['url']
     result = download_audio(youtube_url)
     return jsonify(result)
-
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 if __name__ == '__main__':
     app.run(debug=True)

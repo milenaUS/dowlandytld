@@ -44,5 +44,6 @@ def download_audio_api():
     result = download_audio(youtube_url)
     return jsonify(result)
 
+# Inicia servidor Flask
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=10000)
